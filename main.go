@@ -20,8 +20,8 @@ func main() {
 	switch command {
 	case "step11":
 		RunStep11(args)
-	// case "step12":
-	//  RunStep12(args) // 为未来的步骤预留位置
+	case "step12":
+		RunStep12() // 演示Go版本的加密工具库
 	default:
 		fmt.Printf("错误: 未知的命令 '%s'\n", command)
 		printUsage()
@@ -32,5 +32,6 @@ func printUsage() {
 	fmt.Println("用法: go run . <command> [arguments]")
 	fmt.Println("\n可用命令:")
 	fmt.Println("  step11    - 运行P2P Hello World示例")
+	fmt.Println("  step12    - 演示Go版本的加密工具库")
 	// 在这里添加未来步骤的说明
 }
