@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -215,4 +216,43 @@ func (tx *Transaction) Verify() bool {
 
 	// 所有输入都验证成功
 	return true
+}
+
+// IsCoinbase 检查当前交易是否为 Coinbase 交易
+func (tx *Transaction) IsCoinbase() bool {
+	// 满足三个条件：1.只有一个输入 2.该输入的Txid为空 3.该输入的Vout为-1
+	return len(tx.Vin) == 1 && len(tx.Vin[0].Txid) == 0 && tx.Vin[0].Vout == -1
+}
+
+// NewCoinbaseTX 创建一笔新的 Coinbase 交易
+// to: 接收奖励的矿工地址
+// data: 矿工想写入的任意数据，如果为空则生成默认信息
+func NewCoinbaseTX(to, data string) *Transaction {
+	if data == "" {
+		data = fmt.Sprintf("Reward to '%s'", to)
+	}
+
+	// Coinbase交易的输入，遵循“约定”：
+	// Txid 为空，Vout 为 -1，Signature可以存放任意数据
+	txin := TxInput{
+		Txid:      []byte{},
+		Vout:      -1,
+		Signature: []byte(data),
+		PubKey:    nil,
+	}
+
+	// Coinbase交易的输出，将区块奖励发送给矿工
+	// 注意：这里的Value应该是区块奖励+交易费，为简化，我们先只考虑区块奖励
+	txout := TxOutput{
+		Value:        50, // 硬编码的区块奖励
+		ScriptPubKey: to,
+	}
+
+	tx := Transaction{
+		Vin:  []TxInput{txin},
+		Vout: []TxOutput{txout},
+	}
+	tx.ID = tx.Hash() // 设置交易ID
+
+	return &tx
 }
