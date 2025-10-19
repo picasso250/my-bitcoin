@@ -1,10 +1,8 @@
 package blockchain
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"go.etcd.io/bbolt"
@@ -13,7 +11,6 @@ import (
 const dbFile = "blockchain.db"
 const blocksBucket = "blocks"
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
-const difficulty = 4 // 将挖矿难度定义移到这里，作为链的属性
 
 // Blockchain 结构体代表了整条链
 type Blockchain struct {
@@ -26,7 +23,7 @@ func (bc *Blockchain) DB() *bbolt.DB {
 	return bc.db
 }
 
-// MineBlock 查找、打包交易并创建一个新区块 (工作量证明)
+// MineBlock 打包交易并创建一个新区块 (通过工作量证明)
 func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	var lastHash []byte
 
@@ -40,24 +37,18 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 		log.Panic(err)
 	}
 
-	// 2. 创建新区块
+	// 2. 创建新区块实例
 	newBlock := NewBlock(transactions, lastHash)
 
-	// 3. 工作量证明 (PoW)
-	target := strings.Repeat("0", difficulty)
-	fmt.Printf("Mining the block...\n")
-	for {
-		newBlock.SetHash()
-		hashHex := hex.EncodeToString(newBlock.Hash)
+	// 3. 创建 PoW 实例并执行挖矿
+	pow := NewProofOfWork(newBlock)
+	nonce, hash := pow.Run()
 
-		if strings.HasPrefix(hashHex, target) {
-			fmt.Printf("Mined! hash: %s, nonce: %d\n", hashHex, newBlock.Nonce)
-			break
-		}
-		newBlock.Nonce++
-	}
+	// 4. 将计算出的 Nonce 和 Hash 设置回新区块
+	newBlock.Nonce = nonce
+	newBlock.Hash = hash
 
-	// 4. 将挖出的新区块存入数据库
+	// 5. 将挖出的新区块存入数据库
 	err = bc.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(blocksBucket))
 		err := b.Put(newBlock.Hash, newBlock.Serialize())
@@ -123,4 +114,9 @@ func NewBlockchain(minerAddress string) *Blockchain {
 
 	bc := Blockchain{tip, db}
 	return &bc
+}
+
+// Iterator 返回一个 BlockchainIterator 实例
+func (bc *Blockchain) Iterator() *BlockchainIterator {
+	return &BlockchainIterator{bc.tip, bc.db}
 }
