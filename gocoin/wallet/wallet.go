@@ -11,6 +11,7 @@ import (
 )
 
 const version = byte(0x00)
+const addressChecksumLen = 4
 
 // Wallet stores private and public keys
 type Wallet struct {
@@ -26,11 +27,21 @@ func NewWallet() *Wallet {
 	return &wallet
 }
 
-// GetAddress returns wallet address
-// 我们简化了地址生成过程，直接返回公钥哈希
+// GetAddress returns wallet address with version and checksum
 func (w Wallet) GetAddress() []byte {
+	// 1. Take the public key and hash it twice with SHA-256 and RIPEMD-160
 	pubKeyHash := HashPubKey(w.PublicKey)
-	return pubKeyHash
+
+	// 2. Prepend the version byte to the hash
+	versionedPayload := append([]byte{version}, pubKeyHash...)
+
+	// 3. Calculate the checksum by hashing the versioned payload twice with SHA-256
+	checksum := checksum(versionedPayload)
+
+	// 4. Append the checksum to the versioned payload
+	fullPayload := append(versionedPayload, checksum...)
+
+	return fullPayload
 }
 
 // HashPubKey hashes public key with SHA256 and then RIPEMD160
@@ -45,6 +56,14 @@ func HashPubKey(pubKey []byte) []byte {
 	publicRIPEMD160 := RIPEMD160Hasher.Sum(nil)
 
 	return publicRIPEMD160
+}
+
+// checksum generates a checksum for a public key
+func checksum(payload []byte) []byte {
+	firstSHA := sha256.Sum256(payload)
+	secondSHA := sha256.Sum256(firstSHA[:])
+
+	return secondSHA[:addressChecksumLen]
 }
 
 // Generates a new ECDSA private-public key pair
