@@ -21,10 +21,9 @@ func main() {
 	case "step11":
 		RunStep11(args)
 	case "step12":
-		RunStep12() // 演示Go版本的加密工具库
-
+		RunStep12() // 演示Go版本的核心库与数据结构
 	case "step13":
-		RunStep13() // 演示Go版本的签名与验签
+		RunStep13() // 演示Go版本的UTXO交易创建与签名
 	default:
 		fmt.Printf("错误: 未知的命令 '%s'\n", command)
 		printUsage()
@@ -35,7 +34,7 @@ func printUsage() {
 	fmt.Println("用法: go run . <command> [arguments]")
 	fmt.Println("\n可用命令:")
 	fmt.Println("  step11    - 运行P2P Hello World示例")
-	fmt.Println("  step12    - 演示Go版本的加密工具库")
-	fmt.Println("  step13    - 演示Go版本的签名与验签")
+	fmt.Println("  step12    - 演示Go版本的核心库与数据结构")
+	fmt.Println("  step13    - 演示Go版本的UTXO交易创建与签名")
 	// 在这里添加未来步骤的说明
 }

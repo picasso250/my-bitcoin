@@ -1,57 +1,53 @@
 // step12.go
 //
-// 教学目标：演示如何使用我们新创建的 `blockchain_lib.go` 工具库。
+// 教学目标：演示如何使用我们功能更丰富的 `lib.go` 工具库。
 //
-// 这个文件本身不包含复杂的逻辑，它的主要作用是：
-// 1. 调用库函数来生成密钥对。
-// 2. 调用库函数来派生地址。
-// 3. 打印结果，验证工具库的功能与我们之前Python脚本的输出一致。
+// 我们将演示：
+// 1. 调用库函数生成密钥对和地址 (与之前相同)。
+// 2. 使用库中定义的数据结构 `Transaction` 和 `Block`，并展示它们。
 
 package main
 
 import (
-	"encoding/hex" // <-- 修正：添加缺失的包导入
+	"encoding/hex"
 	"fmt"
 	"log"
-
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // RunStep12 是第12步的入口函数，由 main.go 调用。
 func RunStep12() {
-	fmt.Println("--- Step 12: 演示Go语言版区块链核心库 ---")
+	fmt.Println("--- Step 12: 演示Go语言版区块链核心库与数据结构 ---")
 
-	// 1. 使用库函数生成一个新的密钥对
+	// --- 1. 演示加密功能 (与之前版本类似) ---
 	privateKey, err := NewKeyPair()
 	if err != nil {
 		log.Fatalf("生成密钥对失败: %v", err)
 	}
-
-	// 从私钥中获取公钥
 	publicKey := &privateKey.PublicKey
-
-	// 2. 将密钥转换为十六进制以便打印
-	// crypto.FromECDSA 将私钥对象转换为字节切片
-	privateKeyBytes := crypto.FromECDSA(privateKey)
-	privateKeyHex := hex.EncodeToString(privateKeyBytes)
-
-	// crypto.FromECDSAPub 将公钥对象转换为非压缩字节切片
-	// 我们在这里手动获取压缩公 गोयल用于打印，与地址生成过程保持一致
-	publicKeyBytesCompressed := crypto.CompressPubkey(publicKey)
-	publicKeyHexCompressed := hex.EncodeToString(publicKeyBytesCompressed)
-
-	fmt.Println("\n[1] 生成的密钥对 (secp256k1):")
-	fmt.Printf("  - 私钥 (Hex): %s\n", privateKeyHex)
-	fmt.Printf("  - 公钥 (Compressed Hex): %s\n", publicKeyHexCompressed)
-
-	// 3. 使用库函数从公钥派生地址
 	address := PublicKeyToAddress(publicKey)
 
-	fmt.Println("\n[2] 从公钥派生的教学版地址:")
+	fmt.Println("\n[1] 成功生成密钥和地址:")
 	fmt.Printf("  - 地址 (Hex): %s\n", address)
-	fmt.Println("  - 结构: [版本: 1字节 | 公钥哈希: 20字节 | 校验和: 4字节]")
 
-	fmt.Println("\n[3] 核心概念:")
-	fmt.Println("-> 成功将Python的核心加密逻辑迁移到了可复用的Go函数中。")
-	fmt.Println("-> `blockchain_lib.go` 成为了我们未来构建交易、区块和完整节点的基础。")
+	// --- 2. 演示核心数据结构 ---
+
+	// a) 创建一个空的交易 (此时没有ID, 输入和输出)
+	emptyTx := &Transaction{}
+	fmt.Println("\n[2] 创建一个空的交易结构:")
+	fmt.Printf("  - 交易ID (初始): %s\n", hex.EncodeToString(emptyTx.ID))
+	fmt.Printf("  - 输入数量: %d\n", len(emptyTx.Vin))
+	fmt.Printf("  - 输出数量: %d\n", len(emptyTx.Vout))
+
+	// b) 创建一个创世区块 (没有交易，也没有前一个区块哈希)
+	genesisBlock := NewGenesisBlock()
+	fmt.Println("\n[3] 创建一个创世区块:")
+	fmt.Printf("  - 区块时间戳: %d\n", genesisBlock.Timestamp)
+	fmt.Printf("  - 前一区块哈希: %s\n", hex.EncodeToString(genesisBlock.PrevBlockHash))
+	fmt.Printf("  - 当前区块哈希: %s\n", hex.EncodeToString(genesisBlock.Hash))
+	fmt.Printf("  - 包含交易数: %d\n", len(genesisBlock.Transactions))
+
+
+	fmt.Println("\n[4] 核心概念:")
+	fmt.Println("-> 我们的 `lib.go` 不再仅仅是函数的集合，它现在定义了区块链的骨架。")
+	fmt.Println("-> `Transaction` 和 `Block` 结构体是我们构建完整区块链账本的基石。")
 }

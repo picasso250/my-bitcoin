@@ -1,68 +1,100 @@
 // step13.go
 //
-// 教学目标：演示如何使用 Go 语言实现数字签名与验证。
-// 这与 step2_sign_and_verify.py 的功能完全对应。
+// 教学目标：完整复现 step7 的核心逻辑 —— 创建并签名一笔单输入、双输出的UTXO交易。
+//
+// 这标志着我们已经将Python原型中最核心的交易概念成功迁移到了Go语言的工具库中。
 
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"log"
+
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // RunStep13 是第13步的入口函数，由 main.go 调用。
 func RunStep13() {
-	fmt.Println("--- Step 13: 演示Go语言版签名与验签 ---")
+	fmt.Println("--- Step 13: 演示Go语言版UTXO交易创建与签名 ---")
 
-	// --- 准备工作：生成密钥对 (同第12步) ---
-	privateKey, err := NewKeyPair()
+	// --- 1. 场景设置: 创建参与方 ---
+	// Alice (发送者) 和 Bob (接收者)
+	alicePrivKey, err := NewKeyPair()
 	if err != nil {
-		log.Fatalf("生成密钥对失败: %v", err)
+		log.Fatalf("无法创建Alice的密钥: %v", err)
 	}
-	publicKey := &privateKey.PublicKey
+	alicePubKey := &alicePrivKey.PublicKey
+	aliceAddress := PublicKeyToAddress(alicePubKey)
 
-	// --- 场景模拟 ---
-	// 假设我们要对一笔交易的核心内容进行签名。
-	transactionData := "Alice sends 1 BTC to Bob"
-	fmt.Printf("原始交易数据: '%s'\n", transactionData)
+	_, err = NewKeyPair() // Just to create a different key for Bob
+	if err != nil {
+		log.Fatalf("无法创建Bob的密钥: %v", err)
+	}
+	bobAddress := "1GaR4Mr3o8d3n2AkjJk53B5g3h3s4g5j6k" // 简化演示，Bob只有一个地址字符串
 
-	// --- 签名过程 (由私钥持有者完成) ---
+	fmt.Println("[1] 参与方身份:")
+	fmt.Printf("  - Alice's Address: %s\n", aliceAddress)
+	fmt.Printf("  - Bob's Address:   %s\n", bobAddress)
 
-	// 1. 对交易数据进行哈希运算 (SHA256)
-	//    我们签名的对象是数据的哈希值，而不是原始数据本身。
-	messageBytes := []byte(transactionData)
-	messageHash := sha256.Sum256(messageBytes) // Sum256返回的是[32]byte数组
-	fmt.Printf("\n[1] 交易数据哈希 (SHA256): %s\n", hex.EncodeToString(messageHash[:]))
+	// --- 2. 模拟一个Alice拥有的UTXO ---
+	// 假设Alice拥有一个来自之前某笔交易的输出
+	prevTxID, _ := hex.DecodeString("0000000000000000000000000000000000000000000000000000000000000001")
+	utxoToSpend := TxInput{
+		Txid:      prevTxID,
+		Vout:      0, // 这个UTXO是该交易的第一个输出
+		Signature: nil, // 签名此时为空，稍后填充
+		PubKey:    crypto.CompressPubkey(alicePubKey), // 公钥需要填充，用于验签
+	}
 
-	// 2. 使用私钥签名哈希值
-	//    我们调用 `blockchain_lib.go` 中新增的 Sign 函数。
-	signature, err := Sign(privateKey, messageHash[:]) // 需要将数组转换为切片
+	// --- 3. 构建交易 ---
+	// 目标：Alice想用她那100聪的UTXO，给Bob转30聪，并找零70聪给自己。
+
+	// a) 构建输出 (vout)
+	vout := []TxOutput{
+		{Value: 30, ScriptPubKey: bobAddress},    // 给Bob的
+		{Value: 70, ScriptPubKey: aliceAddress}, // 找零给Alice
+	}
+
+	// b) 组装交易
+	tx := Transaction{
+		Vin:  []TxInput{utxoToSpend},
+		Vout: vout,
+	}
+
+	// c) 计算待签名的交易哈希
+	txHash := tx.Hash()
+	fmt.Printf("\n[2] 构建的交易 (待签名):\n")
+	fmt.Printf("  - 待签名的交易哈希: %s\n", hex.EncodeToString(txHash))
+
+
+	// --- 4. 签名交易 ---
+	signature, err := Sign(alicePrivKey, txHash)
 	if err != nil {
 		log.Fatalf("签名失败: %v", err)
 	}
-	fmt.Printf("\n[2] 生成的数字签名 (Hex): %s\n", hex.EncodeToString(signature))
+	tx.Vin[0].Signature = signature
 
-	// --- 验签过程 (由网络中的任何节点完成) ---
+	// --- 5. 设置最终交易ID ---
+	// 签名完成后，整个交易的内容才算最终确定，此时我们计算最终的ID
+	tx.ID = tx.Hash()
 
-	fmt.Println("\n--- 网络节点开始验证 ---")
+	fmt.Printf("\n[3] 签名完成后的交易:\n")
+	fmt.Printf("  - 最终交易ID: %s\n", hex.EncodeToString(tx.ID))
+	fmt.Printf("  - 输入签名: %s...\n", hex.EncodeToString(tx.Vin[0].Signature)[:20])
 
-	// 3. 节点使用公钥验证签名
-	//    我们调用 `blockchain_lib.go` 中新增的 Verify 函数。
-	//    节点需要拥有：原始数据哈希、签名、发送者的公钥。
-	isValid := Verify(publicKey, messageHash[:], signature)
 
+	// --- 6. 验证交易 (网络节点的操作) ---
+	// 节点需要：交易哈希, 签名, 公钥
+	// 注意：在真实场景中，节点需要从输入中提取公钥字节，然后反序列化为公钥对象。
+	// 这里为简化演示，我们直接使用之前生成的公钥对象。
+	dataToVerify := tx.Hash() // 节点会独立计算这个哈希
+	isValid := Verify(alicePubKey, dataToVerify, tx.Vin[0].Signature)
+
+	fmt.Println("\n[4] 网络节点验证结果:")
 	if isValid {
-		fmt.Println("[3] 验证成功! 👍")
-		fmt.Println("    结论：签名有效，这笔交易确实由公钥所有者发起。")
+		fmt.Println("  - 验证成功! 👍 签名有效。")
 	} else {
-		fmt.Println("[3] 验证失败! 💀")
-		fmt.Println("    结论：签名无效！交易可能是伪造的，或数据已被篡改。")
+		fmt.Println("  - 验证失败! 💀 签名无效。")
 	}
-
-	fmt.Println("\n核心概念:")
-	fmt.Println("-> 签名是使用【私钥】对【数据哈希】进行的操作。")
-	fmt.Println("-> 验证是使用【公钥】对【签名】和【数据哈希】进行的操作。")
-	fmt.Println("-> 我们成功地将签名和验签功能也封装到了 `blockchain_lib.go` 中。")
 }
