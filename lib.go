@@ -91,12 +91,13 @@ func Sign(privateKey *ecdsa.PrivateKey, dataHash []byte) ([]byte, error) {
 // Verify 验证给定的签名是否有效。
 func Verify(publicKey *ecdsa.PublicKey, dataHash []byte, signature []byte) bool {
 	pubKeyBytes := crypto.FromECDSAPub(publicKey)
-	if len(signature) != 65 {
-		return false // 签名长度不正确 (R+S+V)
+	if len(signature) == 0 || len(pubKeyBytes) == 0 || len(dataHash) == 0 {
+		return false
 	}
 	sigWithoutRecoveryID := signature[:len(signature)-1] // 去掉 V
 	return crypto.VerifySignature(pubKeyBytes, dataHash, sigWithoutRecoveryID)
 }
+
 
 // HashTransactions 计算并返回交易列表的哈希值，用于构建区块。
 // 这是一个简化的默克尔树根实现。
@@ -161,4 +162,61 @@ func (tx *Transaction) Hash() []byte {
 	}
 	hash := sha256.Sum256(encoded)
 	return hash[:]
+}
+
+// TrimmedCopy 创建一个交易的深拷贝，其中所有输入的签名都被剥离。
+// 这对于创建用于签名或验证的交易哈希至关重要。
+func (tx *Transaction) TrimmedCopy() Transaction {
+	var inputs []TxInput
+	var outputs []TxOutput
+
+	for _, vin := range tx.Vin {
+		// 只复制ID和Vout，剥离签名，但保留公钥用于后续验证
+		inputs = append(inputs, TxInput{
+			Txid:      vin.Txid,
+			Vout:      vin.Vout,
+			Signature: nil,
+			PubKey:    vin.PubKey, // 保留公钥
+		})
+	}
+	
+	for _, vout := range tx.Vout {
+		outputs = append(outputs, vout)
+	}
+
+	return Transaction{ID: nil, Vin: inputs, Vout: outputs}
+}
+
+
+// Verify 验证交易中所有输入的签名是否都有效。
+// 这是对整个交易合法性的核心检查。
+func (tx *Transaction) Verify() bool {
+	if len(tx.Vin) == 0 {
+		return true // Coinbase交易或无输入的交易，暂定为有效
+	}
+
+	// 制作一个不包含任何签名的交易副本，用于计算待验证的哈希
+	txCopy := tx.TrimmedCopy()
+
+	// 遍历原始交易中的每一个输入，用副本计算哈希并验证签名
+	for _, vin := range tx.Vin {
+		// 1. 计算用于验证的哈希
+		// 这个哈希精确地模拟了当初签名时的交易状态（即，Signature字段为空）
+		dataToVerify := txCopy.Hash()
+
+		// 2. 从字节恢复公钥对象
+		pubKey, err := crypto.DecompressPubkey(vin.PubKey)
+		if err != nil {
+			return false // 如果公钥格式不正确，验证失败
+		}
+
+		// 3. 调用底层的Verify函数进行密码学验证
+		if !Verify(pubKey, dataToVerify, vin.Signature) {
+			// 任何一个签名验证失败，则整个交易无效
+			return false
+		}
+	}
+
+	// 所有输入都验证成功
+	return true
 }
