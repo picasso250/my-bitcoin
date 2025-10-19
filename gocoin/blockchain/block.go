@@ -5,43 +5,66 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"log"
+	"strconv"
 	"time"
 )
 
 // Block 定义了区块的数据结构
-// 注意：为了清晰，我们暂时移除了 Transaction 相关的字段，先聚焦于链本身
 type Block struct {
 	Timestamp     int64
-	Data          []byte // 在这个简化版本中，我们将交易数据抽象为字节切片
+	Transactions  []*Transaction // 区块包含的交易列表
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
+// HashTransactions 计算并返回交易列表的哈希值（简化的默克尔树根）
+func (b *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	for _, tx := range b.Transactions {
+		txHashes = append(txHashes, tx.ID)
+	}
+	txHash := sha256.Sum256(bytes.Join(txHashes, []byte{}))
+	return txHash[:]
+}
+
 // SetHash 计算并设置区块的哈希
+// 这是工作量证明的核心计算部分
 func (b *Block) SetHash() {
-	timestamp := []byte(time.Unix(b.Timestamp, 0).String())
-	headers := bytes.Join([][]byte{b.PrevBlockHash, b.Data, timestamp}, []byte{})
+	timestamp := []byte(strconv.FormatInt(b.Timestamp, 10))
+	nonce := []byte(strconv.Itoa(b.Nonce))
+	headers := bytes.Join(
+		[][]byte{
+			b.PrevBlockHash,
+			b.HashTransactions(),
+			timestamp,
+			nonce,
+		},
+		[]byte{},
+	)
 	hash := sha256.Sum256(headers)
 	b.Hash = hash[:]
 }
 
 // NewBlock 创建一个新的区块
-func NewBlock(data string, prevBlockHash []byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
-		Data:          []byte(data),
+		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
 		Hash:          []byte{},
 		Nonce:         0,
 	}
-	block.SetHash() // 注意：这里我们暂时不进行挖矿，直接设置哈希
+	// 注意：哈希现在由挖矿过程决定，创建时不再计算
 	return block
 }
 
 // NewGenesisBlock 创建创世区块
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func NewGenesisBlock(coinbase *Transaction) *Block {
+	// 创世区块直接创建，不经过挖矿
+	block := NewBlock([]*Transaction{coinbase}, []byte{})
+	block.SetHash()
+	return block
 }
 
 // Serialize 使用 gob 编码将区块序列化为字节切片
