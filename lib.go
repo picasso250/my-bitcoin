@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -30,7 +31,7 @@ type TxInput struct {
 
 // TxOutput 代表一个交易输出
 type TxOutput struct {
-	Value      int    // 金额 (单位: 聪)
+	Value        int    // 金额 (单位: 聪)
 	ScriptPubKey string // 锁定脚本，在我们的简化版里就是接收者地址
 }
 
@@ -43,11 +44,11 @@ type Transaction struct {
 
 // Block 定义了区块的数据结构
 type Block struct {
-	Timestamp    int64
-	Transactions []*Transaction // 区块包含的交易列表
-	PrevBlockHash []byte       // 前一个区块的哈希
-	Hash         []byte       // 当前区块的哈希
-	Nonce        int
+	Timestamp     int64
+	Transactions  []*Transaction // 区块包含的交易列表
+	PrevBlockHash []byte         // 前一个区块的哈希
+	Hash          []byte         // 当前区块的哈希
+	Nonce         int
 }
 
 // --- 核心功能函数 ---
@@ -112,12 +113,14 @@ func (b *Block) HashTransactions() []byte {
 // 这是工作量证明的核心部分。
 func (b *Block) SetHash() {
 	timestamp := []byte(time.Unix(b.Timestamp, 0).String())
+	// 将 Nonce (整数) 转换为其十进制表示的字符串，再转换为字节数组
+	nonce := []byte(strconv.Itoa(b.Nonce))
 	headers := bytes.Join(
 		[][]byte{
 			b.PrevBlockHash,
-			b.HashTransactions(), // 使用交易哈希，而不是整个交易列表
+			b.HashTransactions(),
 			timestamp,
-			[]byte(string(b.Nonce)),
+			nonce, // 使用转换后的 nonce
 		},
 		[]byte{},
 	)
@@ -128,11 +131,11 @@ func (b *Block) SetHash() {
 // NewBlock 创建一个新的区块。
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
-		Timestamp:    time.Now().Unix(),
-		Transactions: transactions,
+		Timestamp:     time.Now().Unix(),
+		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
-		Hash:         []byte{},
-		Nonce:        0,
+		Hash:          []byte{},
+		Nonce:         0,
 	}
 	block.SetHash() // 创建时就计算一次哈希
 	return block
@@ -148,14 +151,14 @@ func NewGenesisBlock() *Block {
 // Hash 计算交易的哈希值（作为交易ID）。
 // 注意：这是一个简化的实现，真实的比特币实现会更复杂。
 func (tx *Transaction) Hash() []byte {
-    txCopy := *tx
-    txCopy.ID = []byte{}
-    
-    encoded, err := json.Marshal(txCopy)
-    if err != nil {
-        // 在实际应用中应处理这个错误
-        return nil 
-    }
-    hash := sha256.Sum256(encoded)
-    return hash[:]
+	txCopy := *tx
+	txCopy.ID = []byte{}
+
+	encoded, err := json.Marshal(txCopy)
+	if err != nil {
+		// 在实际应用中应处理这个错误
+		return nil
+	}
+	hash := sha256.Sum256(encoded)
+	return hash[:]
 }
