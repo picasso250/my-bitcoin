@@ -28,3 +28,50 @@ def generate_address(public_key_bytes):
 
     # 4. 以十六进制返回
     return final_address_bytes.hex()
+import json
+
+def create_signed_simple_transaction(sender_private_key, recipient_address, amount_satoshi):
+    """
+    创建并签名一个简化的、非UTXO模型的交易包。
+
+    这个函数封装了 Step 4 和 Step 5 中的核心逻辑：
+    1. 从发送方私钥派生出公钥和地址。
+    2. 构建交易字典。
+    3. 对交易进行确定性序列化和哈希。
+    4. 使用私钥对哈希进行签名。
+    5. 将所有必要信息打包成一个可验证的字典。
+
+    Args:
+        sender_private_key: ecdsa.SigningKey 对象，交易发送方的私钥。
+        recipient_address (str): 接收方地址的十六进制字符串。
+        amount_satoshi (int): 交易金额，以最小单位“聪”表示。
+
+    Returns:
+        dict: 一个包含交易负载、公钥和签名的字典，可以直接放入区块。
+    """
+    # 1. 从私钥派生公钥和地址
+    sender_public_key = sender_private_key.get_verifying_key()
+    sender_address = generate_address(sender_public_key.to_string("compressed"))
+
+    # 2. 构建交易数据
+    tx_data = {
+        "from": sender_address,
+        "to": recipient_address,
+        "amount": amount_satoshi
+    }
+
+    # 3. 确定性序列化与哈希
+    tx_payload = json.dumps(tx_data, sort_keys=True, separators=(',', ':'))
+    tx_hash = hashlib.sha256(tx_payload.encode('utf-8')).digest()
+
+    # 4. 签名
+    signature = sender_private_key.sign(tx_hash)
+
+    # 5. 打包成最终的交易结构
+    signed_tx = {
+        "transaction_payload": tx_payload,
+        "public_key": sender_public_key.to_string('compressed').hex(),
+        "signature": signature.hex()
+    }
+
+    return signed_tx
