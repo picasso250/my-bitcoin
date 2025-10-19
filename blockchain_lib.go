@@ -13,7 +13,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto" // 导入 go-ethereum 的主 crypto 包
 	"golang.org/x/crypto/ripemd160"
-
 )
 
 // Transaction 定义了一个简化的交易结构 (未来会扩展成UTXO模型)
@@ -26,10 +25,10 @@ type Transaction struct {
 
 // Block 定义了区块的数据结构
 type Block struct {
-	Timestamp     int64
-	Transactions  []Transaction
-	PreviousHash  string
-	Nonce         int
+	Timestamp    int64
+	Transactions []Transaction
+	PreviousHash string
+	Nonce        int
 	// Hash          string // 哈希值将在计算后动态获得
 }
 
@@ -82,7 +81,6 @@ func PublicKeyToAddress(pubKey *ecdsa.PublicKey) string {
 
 	return address
 }
-
 
 // Sign 使用给定的私钥对数据哈希进行签名。
 // 它复现了 step2_sign_and_verify.py 中的签名过程。

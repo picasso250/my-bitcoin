@@ -23,7 +23,7 @@ func main() {
 	case "step12":
 		RunStep12() // 演示Go版本的加密工具库
 
-case "step13":
+	case "step13":
 		RunStep13() // 演示Go版本的签名与验签
 	default:
 		fmt.Printf("错误: 未知的命令 '%s'\n", command)
