@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto" // 导入 go-ethereum 的主 crypto 包
 	"golang.org/x/crypto/ripemd160"
+
 )
 
 // Transaction 定义了一个简化的交易结构 (未来会扩展成UTXO模型)
@@ -80,4 +81,39 @@ func PublicKeyToAddress(pubKey *ecdsa.PublicKey) string {
 	address := hex.EncodeToString(finalAddressBytes)
 
 	return address
+}
+
+
+// Sign 使用给定的私钥对数据哈希进行签名。
+// 它复现了 step2_sign_and_verify.py 中的签名过程。
+//
+// @param privateKey - 用于签名的 *ecdsa.PrivateKey 对象。
+// @param dataHash - 需要被签名的数据的哈希值 (通常是 SHA256)。
+// @return []byte - 生成的签名 (格式为 R || S || V)。
+// @return error - 如果签名过程中发生错误。
+func Sign(privateKey *ecdsa.PrivateKey, dataHash []byte) ([]byte, error) {
+	return crypto.Sign(dataHash, privateKey)
+}
+
+// Verify 验证给定的签名是否有效。
+// 它复现了 step2_sign_and_verify.py 中的验签过程。
+//
+// @param publicKey - 用于验签的 *ecdsa.PublicKey 对象。
+// @param dataHash - 被签名的数据的原始哈希值。
+// @param signature - 需要被验证的签名。
+// @return bool - 如果签名有效则返回 true，否则返回 false。
+func Verify(publicKey *ecdsa.PublicKey, dataHash []byte, signature []byte) bool {
+	// crypto.VerifySignature 需要公钥的字节形式，并且不包含签名的最后一个字节 (recovery id)。
+	// 首先，我们将公钥对象转换为字节切片。
+	pubKeyBytes := crypto.FromECDSAPub(publicKey)
+
+	// crypto.VerifySignature 要求签名是 64 字节 (R+S)，
+	// 而 crypto.Sign 生成的是 65 字节 (R+S+V)。
+	// 因此，我们必须去掉最后一个字节。
+	if len(signature) != 65 {
+		return false // 签名长度不正确
+	}
+	sigWithoutRecoveryID := signature[:len(signature)-1]
+
+	return crypto.VerifySignature(pubKeyBytes, dataHash, sigWithoutRecoveryID)
 }
