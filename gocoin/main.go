@@ -5,9 +5,9 @@ import (
 )
 
 func main() {
-	// For the CLI, we can use a default address for now
-	// This will be improved when we implement wallet management
-	minerAddress := "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
+	// 这个地址现在只是一个占位符，代表矿工的身份
+	// 在后续阶段，我们可以从钱包文件中选择一个地址来使用
+	minerAddress := "miner-reward-address"
 
 	bc := blockchain.NewBlockchain(minerAddress)
 	defer bc.DB().Close()

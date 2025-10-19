@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"my-blockchain/gocoin/blockchain"
+	"my-blockchain/gocoin/wallet"
 )
 
 // CLI 负责处理命令行参数
@@ -17,6 +18,7 @@ type CLI struct {
 
 func (cli *CLI) printUsage() {
 	fmt.Println("Usage:")
+	fmt.Println("  createwallet                 - Generates a new key-pair and saves it into the wallet file")
 	fmt.Println("  addblock -data BLOCK_DATA    - Add a block to the blockchain")
 	fmt.Println("  printchain                   - Print all the blocks of the blockchain")
 }
@@ -46,6 +48,9 @@ func (cli *CLI) printChain() {
 
 	for {
 		block := bci.Next()
+		if block == nil {
+			break
+		}
 
 		fmt.Printf("============ Block %x ============\n", block.Hash)
 		fmt.Printf("Prev. block: %x\n", block.PrevBlockHash)
@@ -62,12 +67,24 @@ func (cli *CLI) printChain() {
 	}
 }
 
+func (cli *CLI) createWallet() {
+	wallets, err := wallet.NewWallets()
+	if err != nil && !os.IsNotExist(err) {
+		log.Panic(err)
+	}
+	address := wallets.CreateWallet()
+	wallets.SaveToFile()
+
+	fmt.Printf("Your new address: %s\n", address)
+}
+
 // Run parses command line arguments and runs commands
 func (cli *CLI) Run() {
 	cli.validateArgs()
 
 	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
+	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 
 	addBlockData := addBlockCmd.String("data", "", "Block data")
 
@@ -79,6 +96,11 @@ func (cli *CLI) Run() {
 		}
 	case "printchain":
 		err := printChainCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "createwallet":
+		err := createWalletCmd.Parse(os.Args[2:])
 		if err != nil {
 			log.Panic(err)
 		}
@@ -97,5 +119,9 @@ func (cli *CLI) Run() {
 
 	if printChainCmd.Parsed() {
 		cli.printChain()
+	}
+
+	if createWalletCmd.Parsed() {
+		cli.createWallet()
 	}
 }
