@@ -75,3 +75,26 @@ def create_signed_simple_transaction(sender_private_key, recipient_address, amou
     }
 
     return signed_tx
+from time import time
+
+def create_candidate_block(transactions, previous_hash='0'*64):
+    """
+    组装一个“候选区块”。
+
+    这个函数封装了区块创建的通用逻辑，使其与挖矿过程解耦。
+    它接收所有需要打包的数据，并返回一个结构化的、准备好被“挖矿”的区块。
+
+    Args:
+        transactions (list): 一个包含已签名交易字典的列表。
+        previous_hash (str, optional): 前一个区块的哈希值. 默认为创世区块的哈希.
+
+    Returns:
+        dict: 一个包含 'timestamp', 'transactions', 'previous_hash', 和 'nonce' 的候选区块字典.
+    """
+    block = {
+        'timestamp': time(),
+        'transactions': transactions,
+        'previous_hash': previous_hash,
+        'nonce': 0  # Nonce总是从0开始尝试
+    }
+    return block
