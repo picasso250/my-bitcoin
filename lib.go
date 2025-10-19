@@ -14,11 +14,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"golang.org/x/crypto/ripemd160"
 )
+
+// --- 常量 ---
+const difficulty = 4 // 定义工作量证明的难度 (需要4个前导零)
 
 // --- 核心数据结构 (源自 Python steps 4-9) ---
 
@@ -129,6 +133,29 @@ func (b *Block) SetHash() {
 	b.Hash = hash[:]
 }
 
+// [NEW] MineBlock 实现了工作量证明算法。
+// 它会不断调整 Nonce 并重新计算哈希，直到找到满足难度要求的哈希值。
+func (b *Block) MineBlock() {
+	target := strings.Repeat("0", difficulty)
+	fmt.Printf("\n[5] 开始挖矿... 目标: 找到一个以 '%s' 开头的哈希。\n", target)
+
+	for {
+		b.SetHash()
+		hashHex := hex.EncodeToString(b.Hash)
+
+		// 提供一个简单的进度反馈
+		if b.Nonce%200000 == 0 && b.Nonce > 0 {
+			fmt.Printf("  - 尝试 Nonce: %d, 哈希: %s...\n", b.Nonce, hashHex[:12])
+		}
+
+		if strings.HasPrefix(hashHex, target) {
+			fmt.Println("🎉 挖矿成功!")
+			break // 找到了!
+		}
+		b.Nonce++
+	}
+}
+
 // NewBlock 创建一个新的区块。
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
@@ -138,7 +165,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 		Hash:          []byte{},
 		Nonce:         0,
 	}
-	block.SetHash() // 创建时就计算一次哈希
+	// 注意：我们不再在创建时计算哈希，因为哈希现在由挖矿过程决定。
 	return block
 }
 
@@ -146,7 +173,9 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 func NewGenesisBlock() *Block {
 	// 创世区块通常包含一个特殊的Coinbase交易
 	// 为简化，我们创建一个没有交易的创世区块
-	return NewBlock([]*Transaction{}, []byte{})
+	block := NewBlock([]*Transaction{}, []byte{})
+	block.SetHash() // 创世区块不需要挖矿，直接设置哈希
+	return block
 }
 
 // Hash 计算交易的哈希值（作为交易ID）。
@@ -188,8 +217,11 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 // Verify 验证交易中所有输入的签名是否都有效。
 // 这是对整个交易合法性的核心检查。
 func (tx *Transaction) Verify() bool {
+	if tx.IsCoinbase() {
+		return true // Coinbase交易无需签名验证
+	}
 	if len(tx.Vin) == 0 {
-		return true // Coinbase交易或无输入的交易，暂定为有效
+		return true // 无输入的交易（非Coinbase），暂定为有效
 	}
 
 	// 制作一个不包含任何签名的交易副本，用于计算待验证的哈希
