@@ -1,4 +1,4 @@
-module go_p2p_hello
+module bitcoin-go-tutorial
 
 go 1.24.6
 
