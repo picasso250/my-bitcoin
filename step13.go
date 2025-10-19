@@ -27,11 +27,13 @@ func RunStep13() {
 	alicePubKey := &alicePrivKey.PublicKey
 	aliceAddress := PublicKeyToAddress(alicePubKey)
 
-	_, err = NewKeyPair() // Just to create a different key for Bob
+	// [FIXED] 为Bob也创建一个合法的密钥对和地址，不再使用硬编码的假地址
+	bobPrivKey, err := NewKeyPair()
 	if err != nil {
 		log.Fatalf("无法创建Bob的密钥: %v", err)
 	}
-	bobAddress := "1GaR4Mr3o8d3n2AkjJk53B5g3h3s4g5j6k" // 简化演示，Bob只有一个地址字符串
+	bobPubKey := &bobPrivKey.PublicKey
+	bobAddress := PublicKeyToAddress(bobPubKey)
 
 	fmt.Println("[1] 参与方身份:")
 	fmt.Printf("  - Alice's Address: %s\n", aliceAddress)
@@ -48,7 +50,7 @@ func RunStep13() {
 	}
 
 	// --- 3. 构建交易 ---
-	// 目标：Alice想用她那100聪的UTXO，给Bob转30聪，并找零70聪给自己。
+	// 目标：Alice想用一个虚拟的UTXO，给Bob转30聪，并找零70聪给自己。
 
 	// a) 构建输出 (vout)
 	vout := []TxOutput{
@@ -62,7 +64,8 @@ func RunStep13() {
 		Vout: vout,
 	}
 
-	// c) 计算待签名的交易哈希
+	// c) 计算待签名的交易哈希 (核心点1)
+	// 这个哈希是基于不含签名的交易内容生成的。这是我们要签名的“合同”。
 	txHash := tx.Hash()
 	fmt.Printf("\n[2] 构建的交易 (待签名):\n")
 	fmt.Printf("  - 待签名的交易哈希: %s\n", hex.EncodeToString(txHash))
@@ -73,10 +76,12 @@ func RunStep13() {
 	if err != nil {
 		log.Fatalf("签名失败: %v", err)
 	}
+	// 将签名填充到交易中
 	tx.Vin[0].Signature = signature
 
 	// --- 5. 设置最终交易ID ---
 	// 签名完成后，整个交易的内容才算最终确定，此时我们计算最终的ID
+	// 注意：这个ID与用于签名的txHash是不同的，因为它现在包含了签名。
 	tx.ID = tx.Hash()
 
 	fmt.Printf("\n[3] 签名完成后的交易:\n")
@@ -86,9 +91,13 @@ func RunStep13() {
 
 	// --- 6. 验证交易 (网络节点的操作) ---
 	// 节点需要：交易哈希, 签名, 公钥
-	// 注意：在真实场景中，节点需要从输入中提取公钥字节，然后反序列化为公钥对象。
-	// 这里为简化演示，我们直接使用之前生成的公钥对象。
-	dataToVerify := tx.Hash() // 节点会独立计算这个哈希
+	
+	// [FIXED] 关键修复点！
+	// 用于验证的数据，必须是当初用于签名的数据。
+	// 当初签名的是 txHash (不含签名的交易哈希)，所以这里必须用它来验证。
+	// 错误的做法是: dataToVerify := tx.Hash()，因为那将是包含了签名的交易哈希。
+	dataToVerify := txHash
+	
 	isValid := Verify(alicePubKey, dataToVerify, tx.Vin[0].Signature)
 
 	fmt.Println("\n[4] 网络节点验证结果:")
