@@ -98,7 +98,6 @@ func Verify(publicKey *ecdsa.PublicKey, dataHash []byte, signature []byte) bool 
 	return crypto.VerifySignature(pubKeyBytes, dataHash, sigWithoutRecoveryID)
 }
 
-
 // HashTransactions 计算并返回交易列表的哈希值，用于构建区块。
 // 这是一个简化的默克尔树根实现。
 func (b *Block) HashTransactions() []byte {
@@ -179,14 +178,11 @@ func (tx *Transaction) TrimmedCopy() Transaction {
 			PubKey:    vin.PubKey, // 保留公钥
 		})
 	}
-	
-	for _, vout := range tx.Vout {
-		outputs = append(outputs, vout)
-	}
+
+	outputs = append(outputs, tx.Vout...)
 
 	return Transaction{ID: nil, Vin: inputs, Vout: outputs}
 }
-
 
 // Verify 验证交易中所有输入的签名是否都有效。
 // 这是对整个交易合法性的核心检查。
