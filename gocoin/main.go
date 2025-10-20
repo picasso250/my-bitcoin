@@ -47,6 +47,9 @@ func runWalletCmd(args []string) {
 	}
 	switch args[0] {
 	case "create":
+		if _, err := os.Stat(walletFile); err == nil {
+			log.Fatalf("钱包已存在（%s），如需新建请先备份并删除原文件", walletFile)
+		}
 		wallets, _ := NewWallets()
 		addr := wallets.CreateWallet()
 		wallets.SaveToFile()
