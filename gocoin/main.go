@@ -135,60 +135,38 @@ func runNodeCmd(args []string) {
 /* ---------- miner ---------- */
 func runMinerCmd(args []string) {
 	fs := flag.NewFlagSet("miner", flag.ExitOnError)
-	listen := fs.String("listen", ":7000", "P2P listen addr")
-	seed := fs.String("seed", "", "Optional seed peer")
 	coinbase := fs.String("coinbase", "", "Coinbase reward address")
 	_ = fs.Parse(args)
 
-	// 新增本地子命令
-	if fs.Arg(0) == "local" {
-		if *coinbase == "" {
-			log.Fatal("-coinbase required for 'local' mode")
-		}
-		wallets, err := NewWallets()
-		if err != nil && !os.IsNotExist(err) {
-			log.Panic(err)
-		}
-		if wallets.GetWallet(*coinbase).PrivateKey.D == nil {
-			log.Fatal("coinbase wallet not found, run 'wallet create' first")
-		}
-		bc := NewBlockchain(*coinbase)
-		defer bc.DB().Close()
-
-		fmt.Println("本地矿工启动，按 Ctrl-C 停止")
-		height := 1
-		for {
-			// 仅打包 coinbase
-			bc.MineBlock([]*Transaction{})
-			fmt.Printf("mined block #%d  %x\n", height, bc.Iterator().Next().Hash)
-			height++
-			time.Sleep(2 * time.Second) // 别占满 CPU
-		}
-	}
-
-	// 原有网络模式保持不变
-	if *coinbase == "" {
-		log.Fatal("-coinbase required")
-	}
+	// 简化矿工功能：直接使用第一个钱包地址作为 coinbase
 	wallets, err := NewWallets()
 	if err != nil && !os.IsNotExist(err) {
 		log.Panic(err)
 	}
-	if wallets.GetWallet(*coinbase).PrivateKey.D == nil {
-		log.Fatal("coinbase wallet not found, run 'wallet create' first")
+	
+	// 获取第一个钱包地址作为 coinbase
+	addresses := wallets.GetAddresses()
+	if len(addresses) == 0 {
+		log.Fatal("没有找到钱包，请先运行 'go run . wallet create' 创建钱包")
 	}
-	bc := NewBlockchain(*coinbase)
+	
+	coinbaseAddr := addresses[0]
+	if *coinbase != "" {
+		coinbaseAddr = *coinbase // 如果指定了 coinbase，使用指定的地址
+	}
+	
+	fmt.Printf("使用钱包地址 %s 作为 coinbase\n", coinbaseAddr)
+	
+	bc := NewBlockchain(coinbaseAddr)
 	defer bc.DB().Close()
 
-	node, err := NewNode(*listen, bc)
-	if err != nil {
-		log.Panic(err)
+	fmt.Println("矿工启动，按 Ctrl-C 停止")
+	height := 1
+	for {
+		// 仅打包 coinbase 交易
+		bc.MineBlock([]*Transaction{})
+		fmt.Printf("已挖出区块 #%d  %x\n", height, bc.Iterator().Next().Hash)
+		height++
+		time.Sleep(2 * time.Second) // 避免占满 CPU
 	}
-	if *seed != "" {
-		if err := node.Connect(*seed); err != nil {
-			log.Println("seed connect error:", err)
-		}
-	}
-	fmt.Println("miner running on", *listen, "ctrl-c to exit")
-	select {} // 永久阻塞，可后续加信号
 }
