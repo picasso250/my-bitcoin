@@ -32,8 +32,7 @@ func NewWallets() (*Wallets, error) {
 // CreateWallet adds a Wallet to Wallets
 func (ws *Wallets) CreateWallet() string {
 	wallet := NewWallet()
-	addressBytes := GetAddress()
-	address := fmt.Sprintf("%x", addressBytes)
+	address := fmt.Sprintf("%x", wallet.GetAddress())
 
 	ws.Wallets[address] = wallet
 
@@ -65,7 +64,7 @@ func (ws *Wallets) LoadFromFile() error {
 	if err != nil {
 		log.Panic(err)
 	}
-	
+
 	// Create a temporary, serializable representation of the wallets
 	var walletsGob map[string]serializableWallet
 	gob.Register(elliptic.P256())
@@ -90,13 +89,12 @@ func (ws *Wallets) LoadFromFile() error {
 			PublicKey: sw.PublicKey,
 		}
 		// Reconstruct public key coordinates from the full public key bytes
-		halfLen := len(PublicKey) / 2
-		PrivateKey.PublicKey.X.SetBytes(PublicKey[:halfLen])
-		PrivateKey.PublicKey.Y.SetBytes(PublicKey[halfLen:])
-		
+		halfLen := len(sw.PublicKey) / 2
+		wallet.PrivateKey.PublicKey.X.SetBytes(sw.PublicKey[:halfLen])
+		wallet.PrivateKey.PublicKey.Y.SetBytes(sw.PublicKey[halfLen:])
+
 		ws.Wallets[address] = wallet
 	}
-
 
 	return nil
 }
@@ -109,8 +107,8 @@ func (ws Wallets) SaveToFile() {
 	walletsGob := make(map[string]serializableWallet)
 	for address, wallet := range ws.Wallets {
 		walletsGob[address] = serializableWallet{
-			PrivateKey: PrivateKey.D.Bytes(),
-			PublicKey:  PublicKey,
+			PrivateKey: wallet.PrivateKey.D.Bytes(),
+			PublicKey:  wallet.PublicKey,
 		}
 	}
 
