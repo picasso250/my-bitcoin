@@ -1,4 +1,4 @@
 
 blockchain.db
-wallets.dat
-gocoin.exe
+wallet.json
+*.exe
