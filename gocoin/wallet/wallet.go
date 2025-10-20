@@ -1,10 +1,13 @@
 package wallet
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"log"
 
 	"golang.org/x/crypto/ripemd160"
@@ -77,4 +80,27 @@ func newKeyPair() (ecdsa.PrivateKey, []byte) {
 	pubKey := append(private.PublicKey.X.Bytes(), private.PublicKey.Y.Bytes()...)
 
 	return *private, pubKey
+}
+
+// DecodeAddress decodes a hex address and returns the public key hash
+func DecodeAddress(address string) ([]byte, error) {
+	fullPayload, err := hex.DecodeString(address)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(fullPayload) < addressChecksumLen+1 {
+		return nil, errors.New("invalid address length")
+	}
+
+	actualChecksum := fullPayload[len(fullPayload)-addressChecksumLen:]
+	versionedPayload := fullPayload[:len(fullPayload)-addressChecksumLen]
+	targetChecksum := checksum(versionedPayload)
+
+	if !bytes.Equal(actualChecksum, targetChecksum) {
+		return nil, errors.New("invalid address checksum")
+	}
+
+	pubKeyHash := versionedPayload[1:] // Remove version byte
+	return pubKeyHash, nil
 }

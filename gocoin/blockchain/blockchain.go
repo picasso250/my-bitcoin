@@ -1,6 +1,7 @@
 package blockchain
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"time"
@@ -15,7 +16,7 @@ const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second
 // Blockchain 结构体代表了整条链
 type Blockchain struct {
 	tip []byte   // 存储最后一个区块的哈希
-	db  *bbolt.DB // 数据库连接 (保持私有)
+	db  *bbolt.DB // 数据库连接
 }
 
 // DB 返回对数据库的引用。这是一个公开的 Getter 方法。
@@ -67,6 +68,10 @@ func (bc *Blockchain) MineBlock(transactions []*Transaction) {
 	if err != nil {
 		log.Panic(err)
 	}
+
+	// 6. 更新 UTXO 集
+	utxoSet := UTXOSet{bc}
+	utxoSet.Update(newBlock)
 }
 
 // NewBlockchain 创建一个新的区块链数据库，如果不存在，则创建创世区块
@@ -113,10 +118,65 @@ func NewBlockchain(minerAddress string) *Blockchain {
 	}
 
 	bc := Blockchain{tip, db}
+
+	// 在启动时重建 UTXO 索引
+	fmt.Println("Reindexing UTXO set...")
+	utxoSet := UTXOSet{&bc}
+	utxoSet.Reindex()
+	fmt.Println("Reindexing finished.")
+
 	return &bc
 }
 
 // Iterator 返回一个 BlockchainIterator 实例
 func (bc *Blockchain) Iterator() *BlockchainIterator {
 	return &BlockchainIterator{bc.tip, bc.db}
+}
+
+// FindAllUTXO finds all unspent transaction outputs and returns a map
+// where keys are transaction IDs and values are slices of output indices
+func (bc *Blockchain) FindAllUTXO() map[string]TxOutputs {
+	UTXO := make(map[string]TxOutputs)
+	spentTXOs := make(map[string][]int)
+	bci := bc.Iterator()
+
+	for {
+		block := bci.Next()
+		if block == nil {
+			break
+		}
+
+		for _, tx := range block.Transactions {
+			txID := hex.EncodeToString(tx.ID)
+
+		Outputs:
+			for outIdx, out := range tx.Vout {
+				// Was the output spent?
+				if spentTXOs[txID] != nil {
+					for _, spentOutIdx := range spentTXOs[txID] {
+						if spentOutIdx == outIdx {
+							continue Outputs
+						}
+					}
+				}
+
+				outs := UTXO[txID]
+				outs.Outputs = append(outs.Outputs, out)
+				UTXO[txID] = outs
+			}
+
+			if !tx.IsCoinbase() {
+				for _, in := range tx.Vin {
+					inTxID := hex.EncodeToString(in.Txid)
+					spentTXOs[inTxID] = append(spentTXOs[inTxID], in.Vout)
+				}
+			}
+		}
+
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+
+	return UTXO
 }

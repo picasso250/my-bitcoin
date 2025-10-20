@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"my-blockchain/gocoin/wallet"
 )
 
 // TxInput 代表一个交易输入
@@ -50,11 +52,11 @@ func (tx *Transaction) IsCoinbase() bool {
 }
 
 // NewCoinbaseTX 创建一笔新的 Coinbase 交易
-// to: 接收奖励的矿工地址
+// toAddress: 接收奖励的矿工地址
 // data: 矿工想写入的任意数据，如果为空则生成默认信息
-func NewCoinbaseTX(to, data string) *Transaction {
+func NewCoinbaseTX(toAddress, data string) *Transaction {
 	if data == "" {
-		data = fmt.Sprintf("Reward to '%s'", to)
+		data = fmt.Sprintf("Reward to '%s'", toAddress)
 	}
 
 	// Coinbase交易的输入，遵循“约定”：
@@ -66,10 +68,14 @@ func NewCoinbaseTX(to, data string) *Transaction {
 	}
 
 	// Coinbase交易的输出，将区块奖励发送给矿工
-	// 注意：这里的PubKeyHash应该是地址解码后的哈希，为简化我们直接存地址
+	// 先将地址解码为公Key哈希
+	pubKeyHash, err := wallet.DecodeAddress(toAddress)
+	if err != nil {
+		log.Panic(err)
+	}
 	txout := TxOutput{
 		Value:      50, // 硬编码的区块奖励
-		PubKeyHash: []byte(to),
+		PubKeyHash: pubKeyHash,
 	}
 
 	tx := Transaction{
@@ -97,8 +103,20 @@ func (tx Transaction) String() string {
 	for i, output := range tx.Vout {
 		lines = append(lines, fmt.Sprintf("     Output %d:", i))
 		lines = append(lines, fmt.Sprintf("       Value:  %d", output.Value))
-		lines = append(lines, fmt.Sprintf("       Script: %s", output.PubKeyHash))
+		lines = append(lines, fmt.Sprintf("       Script: %x", output.PubKeyHash))
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// IsLockedWithKey checks if the output can be used by the owner of the pubkey
+func (out *TxOutput) IsLockedWithKey(pubKeyHash []byte) bool {
+	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
+}
+
+// UsesKey checks if the input uses a specific key
+// For now, this is a simplified check.
+func (in *TxInput) UsesKey(pubKeyHash []byte) bool {
+	lockingHash := wallet.HashPubKey(in.PubKey)
+	return bytes.Compare(lockingHash, pubKeyHash) == 0
 }

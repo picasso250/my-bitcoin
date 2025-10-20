@@ -1,3 +1,4 @@
 __pycache__/
 gocoin/blockchain.db
 gocoin/wallets.dat
+gocoin/gocoin.exe
