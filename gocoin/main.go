@@ -90,6 +90,7 @@ func runNodeCmd(args []string) {
 	}
 }
 
+
 /* ---------- miner ---------- */
 func runMinerCmd(args []string) {
 	fs := flag.NewFlagSet("miner", flag.ExitOnError)
@@ -120,12 +121,30 @@ func runMinerCmd(args []string) {
 
 	fmt.Println("Miner started, Ctrl-C to stop")
 	for {
-		bc.MineBlock([]*Transaction{})
+		// 创建 coinbase 交易，奖励给自己
+		coinbaseTx := NewCoinbaseTX(coinbaseAddr, fmt.Sprintf("Miner reward at %d", time.Now().Unix()))
+		
+		// 挖矿时包含 coinbase 交易
+		transactions := []*Transaction{coinbaseTx}
+		bc.MineBlock(transactions)
 		currentHeight++
+		
+		// 获取最新挖出的区块
 		bci := bc.Iterator()
 		latestBlock := bci.Next()
 		if latestBlock != nil {
-			fmt.Printf("Mined block #%d  %x\n", currentHeight, latestBlock.Hash)
+			fmt.Printf("Mined block #%d  Hash: %x\n", currentHeight, latestBlock.Hash)
+			fmt.Printf("Block contains %d transactions:\n", len(latestBlock.Transactions))
+			
+			// 打印所有交易信息
+			for i, tx := range latestBlock.Transactions {
+				fmt.Printf("Transaction %d:\n", i+1)
+				fmt.Println(tx.String())
+				if tx.IsCoinbase() {
+					fmt.Printf("  -> This is a coinbase transaction, reward: %d coins\n", tx.Vout[0].Value)
+				}
+			}
+			fmt.Println("---")
 		}
 		time.Sleep(2 * time.Second)
 	}
