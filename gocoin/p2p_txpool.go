@@ -1,4 +1,4 @@
-package gocoin
+package main
 
 import (
 	"sync"

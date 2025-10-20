@@ -1,4 +1,4 @@
-package gocoin
+package main
 
 // 纯类型，不给方法
 type JSONBlock struct {

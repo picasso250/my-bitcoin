@@ -1,4 +1,4 @@
-package gocoin
+package main
 
 import (
 	"flag"
@@ -18,6 +18,7 @@ type CLI struct {
 func (cli *CLI) printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  createwallet                 - Generates a new key-pair and saves it into the wallet file")
+	fmt.Println("  getaddress                   - Get the first wallet address")
 	fmt.Println("  getbalance -address ADDRESS  - Get balance of ADDRESS")
 	fmt.Println("  send -from FROM -to TO -amount AMOUNT - Mines a new block with the transaction")
 	fmt.Println("  printchain                   - Print all the blocks of the blockchain")
@@ -54,6 +55,15 @@ func (cli *CLI) createWallet() {
 	cli.wallets.SaveToFile()
 
 	fmt.Printf("Your new address: %s\n", address)
+}
+
+func (cli *CLI) getAddress() {
+	addresses := cli.wallets.GetAddresses()
+	if len(addresses) == 0 {
+		fmt.Println("No wallet addresses found. Please create a wallet first.")
+		return
+	}
+	fmt.Printf("%s\n", addresses[0])
 }
 
 func (cli *CLI) getBalance(address string) {
@@ -102,6 +112,7 @@ func (cli *CLI) Run() {
 
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
+	getAddressCmd := flag.NewFlagSet("getaddress", flag.ExitOnError)
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 
@@ -118,6 +129,11 @@ func (cli *CLI) Run() {
 		}
 	case "createwallet":
 		err := createWalletCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
+	case "getaddress":
+		err := getAddressCmd.Parse(os.Args[2:])
 		if err != nil {
 			log.Panic(err)
 		}
@@ -142,6 +158,10 @@ func (cli *CLI) Run() {
 
 	if createWalletCmd.Parsed() {
 		cli.createWallet()
+	}
+
+	if getAddressCmd.Parsed() {
+		cli.getAddress()
 	}
 
 	if getBalanceCmd.Parsed() {

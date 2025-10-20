@@ -11,10 +11,12 @@ go build
 if ($LASTEXITCODE -ne 0) { throw "编译失败" }
 
 Write-Host "[2] 创建钱包..." -ForegroundColor Cyan
-$raw = (& .\gocoin.exe createwallet) -join "`n"                     # 捕获所有输出
-if ($raw -match 'Your address:\s*([a-fA-F0-9]+)') {                 # 正则抠地址
-    $addr = $Matches[1]
-} else { throw "无法提取钱包地址，原始输出：$raw" }
+& .\gocoin.exe createwallet
+if ($LASTEXITCODE -ne 0) { throw "创建钱包失败" }
+
+Write-Host "[2.1] 获取钱包地址..." -ForegroundColor Cyan
+$addr = & .\gocoin.exe getaddress
+if (-not $addr) { throw "无法获取钱包地址" }
 Write-Host "   得到地址 $addr"
 
 Write-Host "[3] 查初始余额..." -ForegroundColor Green
