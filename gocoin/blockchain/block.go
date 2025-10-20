@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -30,24 +29,6 @@ func (b *Block) HashTransactions() []byte {
 	return txHash[:]
 }
 
-// SetHash 计算并设置区块的哈希
-// 这是工作量证明的核心计算部分
-func (b *Block) SetHash() {
-	timestamp := []byte(strconv.FormatInt(b.Timestamp, 10))
-	nonce := []byte(strconv.Itoa(b.Nonce))
-	headers := bytes.Join(
-		[][]byte{
-			b.PrevBlockHash,
-			b.HashTransactions(),
-			timestamp,
-			nonce,
-		},
-		[]byte{},
-	)
-	hash := sha256.Sum256(headers)
-	b.Hash = hash[:]
-}
-
 // NewBlock 创建一个新的区块
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
@@ -63,9 +44,14 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 
 // NewGenesisBlock 创建创世区块
 func NewGenesisBlock(coinbase *Transaction) *Block {
-	// 创世区块直接创建，不经过挖矿
+	// 创世区块也需要通过挖矿来获得有效的哈希
 	block := NewBlock([]*Transaction{coinbase}, []byte{})
-	block.SetHash()
+	pow := NewProofOfWork(block)
+	nonce, hash := pow.Run()
+
+	block.Hash = hash
+	block.Nonce = nonce
+
 	return block
 }
 
