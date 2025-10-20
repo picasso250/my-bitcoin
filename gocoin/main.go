@@ -26,11 +26,10 @@ func main() {
 
 	// Get the first address as the miner address
 	minerAddress := addresses[0]
-	fmt.Printf("Using miner address: %s\n\n", minerAddress)
 
 	bc := blockchain.NewBlockchain(minerAddress)
 	defer bc.DB().Close()
 
-	cli := CLI{bc}
+	cli := CLI{bc, wallets}
 	cli.Run()
 }

@@ -13,14 +13,15 @@ import (
 
 // CLI 负责处理命令行参数
 type CLI struct {
-	bc *blockchain.Blockchain
+	bc      *blockchain.Blockchain
+	wallets *wallet.Wallets // Add wallets to CLI
 }
 
 func (cli *CLI) printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  createwallet                 - Generates a new key-pair and saves it into the wallet file")
 	fmt.Println("  getbalance -address ADDRESS  - Get balance of ADDRESS")
-	fmt.Println("  addblock -data BLOCK_DATA    - Add a block to the blockchain (deprecated)")
+	fmt.Println("  addblock                     - Mines a new block with a coinbase reward")
 	fmt.Println("  printchain                   - Print all the blocks of the blockchain")
 }
 
@@ -31,17 +32,26 @@ func (cli *CLI) validateArgs() {
 	}
 }
 
-// addBlock a temporary method to add blocks for testing
-func (cli *CLI) addBlock(data string) {
-	// For now, we will create a simple transaction to include in the block
-	// This is a placeholder and doesn't create valid spendable outputs
-	tx := &blockchain.Transaction{
-		Vin:  []blockchain.TxInput{{Txid: []byte{}, Vout: -1, PubKey: []byte(data)}},
-		Vout: []blockchain.TxOutput{{Value: 1, PubKeyHash: []byte("unspendable")}},
+// addBlock now correctly creates a coinbase transaction and mines a block.
+func (cli *CLI) addBlock() {
+	// For simplicity, we'll use the first address in the wallet as the miner address.
+	// This mirrors the logic in main.go
+	addresses := cli.wallets.GetAddresses()
+	if len(addresses) == 0 {
+		fmt.Println("No addresses found. Please create a wallet first.")
+		os.Exit(1)
 	}
-	tx.SetID()
-	cli.bc.MineBlock([]*blockchain.Transaction{tx})
-	fmt.Println("Success! (Note: addblock creates non-standard transactions)")
+	minerAddress := addresses[0]
+
+	fmt.Printf("Mining a new block, reward to: %s\n", minerAddress)
+
+	// Create the coinbase transaction
+	coinbaseTx := blockchain.NewCoinbaseTX(minerAddress, "")
+
+	// Mine the block with the coinbase transaction
+	cli.bc.MineBlock([]*blockchain.Transaction{coinbaseTx})
+
+	fmt.Println("Success! New block mined.")
 }
 
 func (cli *CLI) printChain() {
@@ -69,12 +79,8 @@ func (cli *CLI) printChain() {
 }
 
 func (cli *CLI) createWallet() {
-	wallets, err := wallet.NewWallets()
-	if err != nil && !os.IsNotExist(err) {
-		log.Panic(err)
-	}
-	address := wallets.CreateWallet()
-	wallets.SaveToFile()
+	address := cli.wallets.CreateWallet()
+	cli.wallets.SaveToFile()
 
 	fmt.Printf("Your new address: %s\n", address)
 }
@@ -106,7 +112,6 @@ func (cli *CLI) Run() {
 	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
 
-	addBlockData := addBlockCmd.String("data", "", "Block data")
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
 
 	switch os.Args[1] {
@@ -136,11 +141,7 @@ func (cli *CLI) Run() {
 	}
 
 	if addBlockCmd.Parsed() {
-		if *addBlockData == "" {
-			addBlockCmd.Usage()
-			os.Exit(1)
-		}
-		cli.addBlock(*addBlockData)
+		cli.addBlock()
 	}
 
 	if printChainCmd.Parsed() {
