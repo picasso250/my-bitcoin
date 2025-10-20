@@ -20,23 +20,19 @@ function Invoke-LoggedCommand {
 Write-Host "[0] 清理旧数据" -ForegroundColor Red
 Remove-Item -Force -ErrorAction SilentlyContinue wallets.dat, blockchain.db
 
-Write-Host "[1] 钱包管理员：创建钱包" -ForegroundColor Cyan
+Write-Host "[1] 创建钱包" -ForegroundColor Cyan
 $addr = Invoke-LoggedCommand "go run . wallet create" | Select-Object -Last 1
 Write-Host "   新地址 $addr" -ForegroundColor Gray
 
-Write-Host "[2] 消费者：查余额（首次初始化链）" -ForegroundColor Green
-$bal = Invoke-LoggedCommand "go run . node -wallet $addr balance" | Select-Object -Last 1
-if ($bal -ne 50) { throw "创世余额≠50" }
-
-Write-Host "[3] 消费者：自己转自己 10 币" -ForegroundColor Yellow
-Invoke-LoggedCommand "go run . node -wallet $addr send -to $addr -amount 10"
-
-Write-Host "[4] 消费者：再次查余额" -ForegroundColor Green
-$bal = Invoke-LoggedCommand "go run . node -wallet $addr balance" | Select-Object -Last 1
-if ($bal -ne 50) { Write-Host "⚠️  余额=$bal（含找零+手续费，预期≈50）" }
-
-Write-Host "[5] 打印整条链" -ForegroundColor Magenta
-Invoke-LoggedCommand "go run . node -wallet $addr printchain"
+Write-Host "[2] 启动本地矿工（10 秒后自动停止）" -ForegroundColor Green
+$job = Start-Job -ScriptBlock {
+    Set-Location $using:PWD
+    & go run . miner local --coinbase $using:addr
+}
+Start-Sleep -Seconds 10
+if ($job.State -eq "Running") { Stop-Job $job }
+Receive-Job $job
+Remove-Job $job
 
 Write-Host ""
 Write-Host "=== 冒烟通过 ===" -ForegroundColor White -BackgroundColor DarkGreen

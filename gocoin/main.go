@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 )
 
 const usage = `
@@ -70,8 +71,6 @@ func runWalletCmd(args []string) {
 /* ---------- node ---------- */
 func runNodeCmd(args []string) {
 	fs := flag.NewFlagSet("node", flag.ExitOnError)
-	// listen := fs.String("listen", "", "P2P listen addr, e.g. :0")
-	// seed := fs.String("seed", "", "Optional seed peer")
 	walletStr := fs.String("wallet", "", "Wallet address to use")
 	_ = fs.Parse(args)
 
@@ -140,6 +139,34 @@ func runMinerCmd(args []string) {
 	seed := fs.String("seed", "", "Optional seed peer")
 	coinbase := fs.String("coinbase", "", "Coinbase reward address")
 	_ = fs.Parse(args)
+
+	// 新增本地子命令
+	if fs.Arg(0) == "local" {
+		if *coinbase == "" {
+			log.Fatal("-coinbase required for 'local' mode")
+		}
+		wallets, err := NewWallets()
+		if err != nil && !os.IsNotExist(err) {
+			log.Panic(err)
+		}
+		if wallets.GetWallet(*coinbase).PrivateKey.D == nil {
+			log.Fatal("coinbase wallet not found, run 'wallet create' first")
+		}
+		bc := NewBlockchain(*coinbase)
+		defer bc.DB().Close()
+
+		fmt.Println("本地矿工启动，按 Ctrl-C 停止")
+		height := 1
+		for {
+			// 仅打包 coinbase
+			bc.MineBlock([]*Transaction{})
+			fmt.Printf("mined block #%d  %x\n", height, bc.Iterator().Next().Hash)
+			height++
+			time.Sleep(2 * time.Second) // 别占满 CPU
+		}
+	}
+
+	// 原有网络模式保持不变
 	if *coinbase == "" {
 		log.Fatal("-coinbase required")
 	}

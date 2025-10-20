@@ -1,2 +1,1 @@
-rm .\blockchain.db
-rm .\wallets.dat
+Remove-Item -Force -ErrorAction SilentlyContinue wallets.dat, blockchain.db
