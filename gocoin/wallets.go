@@ -1,4 +1,4 @@
-package wallet
+package gocoin
 
 import (
 	"bytes"
@@ -32,7 +32,7 @@ func NewWallets() (*Wallets, error) {
 // CreateWallet adds a Wallet to Wallets
 func (ws *Wallets) CreateWallet() string {
 	wallet := NewWallet()
-	addressBytes := wallet.GetAddress()
+	addressBytes := GetAddress()
 	address := fmt.Sprintf("%x", addressBytes)
 
 	ws.Wallets[address] = wallet
@@ -90,9 +90,9 @@ func (ws *Wallets) LoadFromFile() error {
 			PublicKey: sw.PublicKey,
 		}
 		// Reconstruct public key coordinates from the full public key bytes
-		halfLen := len(wallet.PublicKey) / 2
-		wallet.PrivateKey.PublicKey.X.SetBytes(wallet.PublicKey[:halfLen])
-		wallet.PrivateKey.PublicKey.Y.SetBytes(wallet.PublicKey[halfLen:])
+		halfLen := len(PublicKey) / 2
+		PrivateKey.PublicKey.X.SetBytes(PublicKey[:halfLen])
+		PrivateKey.PublicKey.Y.SetBytes(PublicKey[halfLen:])
 		
 		ws.Wallets[address] = wallet
 	}
@@ -109,8 +109,8 @@ func (ws Wallets) SaveToFile() {
 	walletsGob := make(map[string]serializableWallet)
 	for address, wallet := range ws.Wallets {
 		walletsGob[address] = serializableWallet{
-			PrivateKey: wallet.PrivateKey.D.Bytes(),
-			PublicKey:  wallet.PublicKey,
+			PrivateKey: PrivateKey.D.Bytes(),
+			PublicKey:  PublicKey,
 		}
 	}
 

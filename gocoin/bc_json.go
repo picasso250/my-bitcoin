@@ -1,20 +1,19 @@
-package blockchain
+package gocoin
 
 import (
 	"encoding/hex"
 	"encoding/json"
 
-	"my-blockchain/gocoin/p2p" // 引入刚搬走的类型
 )
 
 // 以下方法仍挂在区块链自己的类型上，但内部使用 p2p 包里的视图结构
 func (b *Block) MarshalJSON() ([]byte, error) {
-	jb := p2p.JSONBlock{
+	jb := JSONBlock{
 		Hash:          hex.EncodeToString(b.Hash),
 		PrevBlockHash: hex.EncodeToString(b.PrevBlockHash),
 		Timestamp:     b.Timestamp,
 		Nonce:         b.Nonce,
-		Transactions:  make([]p2p.JSONTx, len(b.Transactions)),
+		Transactions:  make([]JSONTx, len(b.Transactions)),
 	}
 	for i, tx := range b.Transactions {
 		jb.Transactions[i] = txToJSON(tx)
@@ -23,7 +22,7 @@ func (b *Block) MarshalJSON() ([]byte, error) {
 }
 
 func (b *Block) UnmarshalJSON(data []byte) error {
-	var jb p2p.JSONBlock
+	var jb JSONBlock
 	if err := json.Unmarshal(data, &jb); err != nil {
 		return err
 	}
@@ -43,7 +42,7 @@ func (tx *Transaction) MarshalJSON() ([]byte, error) {
 }
 
 func (tx *Transaction) UnmarshalJSON(data []byte) error {
-	var jtx p2p.JSONTx
+	var jtx JSONTx
 	if err := json.Unmarshal(data, &jtx); err != nil {
 		return err
 	}
@@ -52,14 +51,14 @@ func (tx *Transaction) UnmarshalJSON(data []byte) error {
 }
 
 // ---------- 辅助函数 ----------
-func txToJSON(tx *Transaction) p2p.JSONTx {
-	jtx := p2p.JSONTx{
+func txToJSON(tx *Transaction) JSONTx {
+	jtx := JSONTx{
 		ID:   hex.EncodeToString(tx.ID),
-		Vin:  make([]p2p.JSONTxIn, len(tx.Vin)),
-		Vout: make([]p2p.JSONTxOut, len(tx.Vout)),
+		Vin:  make([]JSONTxIn, len(tx.Vin)),
+		Vout: make([]JSONTxOut, len(tx.Vout)),
 	}
 	for i, in := range tx.Vin {
-		jtx.Vin[i] = p2p.JSONTxIn{
+		jtx.Vin[i] = JSONTxIn{
 			Txid:      hex.EncodeToString(in.Txid),
 			Vout:      in.Vout,
 			Signature: hex.EncodeToString(in.Signature),
@@ -67,7 +66,7 @@ func txToJSON(tx *Transaction) p2p.JSONTx {
 		}
 	}
 	for i, out := range tx.Vout {
-		jtx.Vout[i] = p2p.JSONTxOut{
+		jtx.Vout[i] = JSONTxOut{
 			Value:      out.Value,
 			PubKeyHash: hex.EncodeToString(out.PubKeyHash),
 		}
@@ -75,7 +74,7 @@ func txToJSON(tx *Transaction) p2p.JSONTx {
 	return jtx
 }
 
-func jsonToTx(jtx p2p.JSONTx) *Transaction {
+func jsonToTx(jtx JSONTx) *Transaction {
 	tx := &Transaction{
 		ID:   make([]byte, 32),
 		Vin:  make([]TxInput, len(jtx.Vin)),

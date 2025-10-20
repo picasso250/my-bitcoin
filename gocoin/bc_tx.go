@@ -1,4 +1,4 @@
-package blockchain
+package gocoin
 
 import (
 	"bytes"
@@ -12,8 +12,6 @@ import (
 	"log"
 	"math/big"
 	"strings"
-
-	"my-blockchain/gocoin/wallet"
 )
 
 // Transaction represents a Bitcoin transaction
@@ -69,7 +67,7 @@ func NewCoinbaseTX(to, data string) *Transaction {
 
 	txin := TxInput{[]byte{}, -1, nil, []byte(data)}
 	
-	pubKeyHash, err := wallet.DecodeAddress(to)
+	pubKeyHash, err := DecodeAddress(to)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -82,11 +80,11 @@ func NewCoinbaseTX(to, data string) *Transaction {
 }
 
 // NewUTXOTransaction creates a new transaction
-func NewUTXOTransaction(fromWallet *wallet.Wallet, to string, amount int, utxoSet *UTXOSet) (*Transaction, error) {
+func NewUTXOTransaction(fromWallet *Wallet, to string, amount int, utxoSet *UTXOSet) (*Transaction, error) {
 	var inputs []TxInput
 	var outputs []TxOutput
 
-	pubKeyHash := wallet.HashPubKey(fromWallet.PublicKey)
+	pubKeyHash := HashPubKey(fromWallet.PublicKey)
 	acc, validOutputs := utxoSet.FindSpendableOutputs(pubKeyHash, amount)
 
 	if acc < amount {
@@ -107,7 +105,7 @@ func NewUTXOTransaction(fromWallet *wallet.Wallet, to string, amount int, utxoSe
 	}
 
 	// Build a list of outputs
-	toPubKeyHash, err := wallet.DecodeAddress(to)
+	toPubKeyHash, err := DecodeAddress(to)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -259,6 +257,6 @@ func (out *TxOutput) IsLockedWithKey(pubKeyHash []byte) bool {
 
 // UsesKey checks if the input uses a specific key
 func (in *TxInput) UsesKey(pubKeyHash []byte) bool {
-	lockingHash := wallet.HashPubKey(in.PubKey)
+	lockingHash := HashPubKey(in.PubKey)
 	return bytes.Equal(lockingHash, pubKeyHash)
 }

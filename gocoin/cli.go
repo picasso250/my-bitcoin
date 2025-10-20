@@ -1,4 +1,4 @@
-package main
+package gocoin
 
 import (
 	"flag"
@@ -6,15 +6,13 @@ import (
 	"log"
 	"os"
 	"strconv"
-
-	"my-blockchain/gocoin/blockchain"
-	"my-blockchain/gocoin/wallet"
 )
 
 // CLI responsible for processing command line arguments
 type CLI struct {
-	bc      *blockchain.Blockchain
-	wallets *wallet.Wallets
+	bc      *Blockchain
+	wallets *Wallets
+	node    *Node //新增
 }
 
 func (cli *CLI) printUsage() {
@@ -42,9 +40,8 @@ func (cli *CLI) printChain() {
 		}
 
 		fmt.Printf("%s\n", block.String())
-		pow := blockchain.NewProofOfWork(block)
+		pow := NewProofOfWork(block)
 		fmt.Printf("PoW: %s\n\n", strconv.FormatBool(pow.Validate()))
-		
 
 		if len(block.PrevBlockHash) == 0 {
 			break
@@ -60,13 +57,13 @@ func (cli *CLI) createWallet() {
 }
 
 func (cli *CLI) getBalance(address string) {
-	pubKeyHash, err := wallet.DecodeAddress(address)
+	pubKeyHash, err := DecodeAddress(address)
 	if err != nil {
 		fmt.Println("ERROR: Invalid address")
 		log.Panic(err)
 	}
 
-	utxoSet := blockchain.UTXOSet{Blockchain: cli.bc}
+	utxoSet := UTXOSet{Blockchain: cli.bc}
 	utxos := utxoSet.FindUTXO(pubKeyHash)
 
 	balance := 0
@@ -79,23 +76,25 @@ func (cli *CLI) getBalance(address string) {
 
 func (cli *CLI) send(from, to string, amount int) {
 	fromWallet := cli.wallets.GetWallet(from)
-	utxoSet := blockchain.UTXOSet{Blockchain: cli.bc}
+	utxoSet := UTXOSet{Blockchain: cli.bc}
 
-	tx, err := blockchain.NewUTXOTransaction(&fromWallet, to, amount, &utxoSet)
+	tx, err := NewUTXOTransaction(&fromWallet, to, amount, &utxoSet)
 	if err != nil {
 		fmt.Printf("Failed to create transaction: %s\n", err)
 		return
 	}
-	
+
 	// For simplicity in this version, the sender of the transaction also mines the block.
 	// A coinbase transaction is added to reward the miner.
-	cbTx := blockchain.NewCoinbaseTX(from, "")
-	txs := []*blockchain.Transaction{cbTx, tx}
+	cbTx := NewCoinbaseTX(from, "")
+	txs := []*Transaction{cbTx, tx}
 
 	cli.bc.MineBlock(txs)
 	fmt.Println("Success! Transaction sent.")
+	if cli.node != nil {
+		cli.node.BroadcastTx(tx)
+	}
 }
-
 
 // Run parses command line arguments and processes commands
 func (cli *CLI) Run() {
@@ -110,7 +109,6 @@ func (cli *CLI) Run() {
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
 	sendTo := sendCmd.String("to", "", "Destination wallet address")
 	sendAmount := sendCmd.Int("amount", 0, "Amount to send")
-
 
 	switch os.Args[1] {
 	case "printchain":

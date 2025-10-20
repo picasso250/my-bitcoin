@@ -1,4 +1,4 @@
-package p2p
+package gocoin
 
 import (
 	"encoding/json"
@@ -60,3 +60,6 @@ type PingPayload struct {
 type PongPayload struct {
 	Nonce uint64 `json:"nonce"`
 }
+
+type GetMempoolPayload struct{}
+type MempoolPayload struct{ Hashes [][]byte `json:"hashes"` }

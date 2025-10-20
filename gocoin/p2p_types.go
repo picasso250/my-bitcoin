@@ -1,4 +1,4 @@
-package p2p
+package gocoin
 
 // 纯类型，不给方法
 type JSONBlock struct {
