@@ -11,17 +11,17 @@ import (
 	"my-blockchain/gocoin/wallet"
 )
 
-// CLI 负责处理命令行参数
+// CLI responsible for processing command line arguments
 type CLI struct {
 	bc      *blockchain.Blockchain
-	wallets *wallet.Wallets // Add wallets to CLI
+	wallets *wallet.Wallets
 }
 
 func (cli *CLI) printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  createwallet                 - Generates a new key-pair and saves it into the wallet file")
 	fmt.Println("  getbalance -address ADDRESS  - Get balance of ADDRESS")
-	fmt.Println("  addblock                     - Mines a new block with a coinbase reward")
+	fmt.Println("  send -from FROM -to TO -amount AMOUNT - Mines a new block with the transaction")
 	fmt.Println("  printchain                   - Print all the blocks of the blockchain")
 }
 
@@ -30,28 +30,6 @@ func (cli *CLI) validateArgs() {
 		cli.printUsage()
 		os.Exit(1)
 	}
-}
-
-// addBlock now correctly creates a coinbase transaction and mines a block.
-func (cli *CLI) addBlock() {
-	// For simplicity, we'll use the first address in the wallet as the miner address.
-	// This mirrors the logic in main.go
-	addresses := cli.wallets.GetAddresses()
-	if len(addresses) == 0 {
-		fmt.Println("No addresses found. Please create a wallet first.")
-		os.Exit(1)
-	}
-	minerAddress := addresses[0]
-
-	fmt.Printf("Mining a new block, reward to: %s\n", minerAddress)
-
-	// Create the coinbase transaction
-	coinbaseTx := blockchain.NewCoinbaseTX(minerAddress, "")
-
-	// Mine the block with the coinbase transaction
-	cli.bc.MineBlock([]*blockchain.Transaction{coinbaseTx})
-
-	fmt.Println("Success! New block mined.")
 }
 
 func (cli *CLI) printChain() {
@@ -63,14 +41,10 @@ func (cli *CLI) printChain() {
 			break
 		}
 
-		fmt.Printf("============ Block %x ============\n", block.Hash)
-		fmt.Printf("Prev. block: %x\n", block.PrevBlockHash)
+		fmt.Printf("%s\n", block.String())
 		pow := blockchain.NewProofOfWork(block)
 		fmt.Printf("PoW: %s\n\n", strconv.FormatBool(pow.Validate()))
-		for _, tx := range block.Transactions {
-			fmt.Println(tx)
-		}
-		fmt.Printf("\n\n")
+		
 
 		if len(block.PrevBlockHash) == 0 {
 			break
@@ -103,23 +77,42 @@ func (cli *CLI) getBalance(address string) {
 	fmt.Printf("Balance of '%s': %d\n", address, balance)
 }
 
-// Run parses command line arguments and runs commands
+func (cli *CLI) send(from, to string, amount int) {
+	fromWallet := cli.wallets.GetWallet(from)
+	utxoSet := blockchain.UTXOSet{Blockchain: cli.bc}
+
+	tx, err := blockchain.NewUTXOTransaction(&fromWallet, to, amount, &utxoSet)
+	if err != nil {
+		fmt.Printf("Failed to create transaction: %s\n", err)
+		return
+	}
+	
+	// For simplicity in this version, the sender of the transaction also mines the block.
+	// A coinbase transaction is added to reward the miner.
+	cbTx := blockchain.NewCoinbaseTX(from, "")
+	txs := []*blockchain.Transaction{cbTx, tx}
+
+	cli.bc.MineBlock(txs)
+	fmt.Println("Success! Transaction sent.")
+}
+
+
+// Run parses command line arguments and processes commands
 func (cli *CLI) Run() {
 	cli.validateArgs()
 
-	addBlockCmd := flag.NewFlagSet("addblock", flag.ExitOnError)
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	createWalletCmd := flag.NewFlagSet("createwallet", flag.ExitOnError)
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
+	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
+	sendFrom := sendCmd.String("from", "", "Source wallet address")
+	sendTo := sendCmd.String("to", "", "Destination wallet address")
+	sendAmount := sendCmd.Int("amount", 0, "Amount to send")
+
 
 	switch os.Args[1] {
-	case "addblock":
-		err := addBlockCmd.Parse(os.Args[2:])
-		if err != nil {
-			log.Panic(err)
-		}
 	case "printchain":
 		err := printChainCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -135,13 +128,14 @@ func (cli *CLI) Run() {
 		if err != nil {
 			log.Panic(err)
 		}
+	case "send":
+		err := sendCmd.Parse(os.Args[2:])
+		if err != nil {
+			log.Panic(err)
+		}
 	default:
 		cli.printUsage()
 		os.Exit(1)
-	}
-
-	if addBlockCmd.Parsed() {
-		cli.addBlock()
 	}
 
 	if printChainCmd.Parsed() {
@@ -158,5 +152,13 @@ func (cli *CLI) Run() {
 			os.Exit(1)
 		}
 		cli.getBalance(*getBalanceAddress)
+	}
+
+	if sendCmd.Parsed() {
+		if *sendFrom == "" || *sendTo == "" || *sendAmount <= 0 {
+			sendCmd.Usage()
+			os.Exit(1)
+		}
+		cli.send(*sendFrom, *sendTo, *sendAmount)
 	}
 }

@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/hex"
 	"log"
 
 	"go.etcd.io/bbolt"
@@ -10,108 +11,39 @@ import (
 
 const utxoBucket = "chainstate"
 
-// UTXOSet represents the UTXO set.
+// UTXOSet represents a set of UTXO.
 type UTXOSet struct {
 	Blockchain *Blockchain
 }
 
-// Reindex finds all unspent transaction outputs and rebuilds the UTXO set
-func (u UTXOSet) Reindex() {
-	db := u.Blockchain.db
-	bucketName := []byte(utxoBucket)
-
-	// 1. Delete the old bucket if it exists
-	err := db.Update(func(tx *bbolt.Tx) error {
-		err := tx.DeleteBucket(bucketName)
-		if err != nil && err != bbolt.ErrBucketNotFound {
-			log.Panic(err)
-		}
-
-		_, err = tx.CreateBucket(bucketName)
-		if err != nil {
-			log.Panic(err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Panic(err)
-	}
-
-	// 2. Find all unspent outputs from the entire blockchain
-	UTXO := u.Blockchain.FindAllUTXO()
-
-	// 3. Populate the bucket with the found UTXOs
-	err = db.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket(bucketName)
-
-		for txID, outs := range UTXO {
-			key := []byte(txID)
-			err := b.Put(key, outs.Serialize())
-			if err != nil {
-				log.Panic(err)
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Panic(err)
-	}
-}
-
-// Update updates the UTXO set with the transactions from the new block.
-// NOTE: This function should be called AFTER the new block has been added to the DB.
-func (u UTXOSet) Update(block *Block) {
+// FindSpendableOutputs finds and returns unspent outputs to reference in inputs
+func (u UTXOSet) FindSpendableOutputs(pubkeyHash []byte, amount int) (int, map[string][]int) {
+	unspentOutputs := make(map[string][]int)
+	accumulated := 0
 	db := u.Blockchain.db
 
-	err := db.Update(func(tx *bbolt.Tx) error {
+	err := db.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(utxoBucket))
+		c := b.Cursor()
 
-		for _, tx := range block.Transactions {
-			// Remove spent outputs (inputs of the new transaction) from the UTXO set
-			if !tx.IsCoinbase() {
-				for _, vin := range tx.Vin {
-					updatedOuts := TxOutputs{}
-					outsBytes := b.Get(vin.Txid)
-					outs := DeserializeOutputs(outsBytes)
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			txID := hex.EncodeToString(k)
+			outs := DeserializeOutputs(v)
 
-					for outIdx, out := range outs.Outputs {
-						if outIdx != vin.Vout {
-							updatedOuts.Outputs = append(updatedOuts.Outputs, out)
-						}
-					}
-
-					if len(updatedOuts.Outputs) == 0 {
-						err := b.Delete(vin.Txid)
-						if err != nil {
-							log.Panic(err)
-						}
-					} else {
-						err := b.Put(vin.Txid, updatedOuts.Serialize())
-						if err != nil {
-							log.Panic(err)
-						}
-					}
+			for outIdx, out := range outs.Outputs {
+				if out.IsLockedWithKey(pubkeyHash) && accumulated < amount {
+					accumulated += out.Value
+					unspentOutputs[txID] = append(unspentOutputs[txID], outIdx)
 				}
 			}
-
-			// Add new unspent outputs from the new transaction
-			newOutputs := TxOutputs{}
-			for _, out := range tx.Vout {
-				newOutputs.Outputs = append(newOutputs.Outputs, out)
-			}
-			err := b.Put(tx.ID, newOutputs.Serialize())
-			if err != nil {
-				log.Panic(err)
-			}
 		}
-
 		return nil
 	})
 	if err != nil {
 		log.Panic(err)
 	}
+
+	return accumulated, unspentOutputs
 }
 
 // FindUTXO finds all unspent transaction outputs for a given public key hash.
@@ -140,6 +72,102 @@ func (u UTXOSet) FindUTXO(pubKeyHash []byte) []TxOutput {
 	}
 
 	return UTXOs
+}
+
+// Reindex rebuilds the UTXO set
+func (u UTXOSet) Reindex() {
+	db := u.Blockchain.db
+	bucketName := []byte(utxoBucket)
+
+	err := db.Update(func(tx *bbolt.Tx) error {
+		err := tx.DeleteBucket(bucketName)
+		if err != nil && err != bbolt.ErrBucketNotFound {
+			log.Panic(err)
+		}
+
+		_, err = tx.CreateBucket(bucketName)
+		if err != nil {
+			log.Panic(err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Panic(err)
+	}
+
+	UTXO := u.Blockchain.FindAllUTXO()
+
+	err = db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket(bucketName)
+
+		for txID, outs := range UTXO {
+			key, err := hex.DecodeString(txID)
+			if err != nil {
+				log.Panic(err)
+			}
+			err = b.Put(key, outs.Serialize())
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Panic(err)
+	}
+}
+
+// Update updates the UTXO set with transactions from the Block
+func (u UTXOSet) Update(block *Block) {
+	db := u.Blockchain.db
+
+	err := db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(utxoBucket))
+
+		for _, tx := range block.Transactions {
+			if !tx.IsCoinbase() {
+				for _, vin := range tx.Vin {
+					updatedOuts := TxOutputs{}
+					outsBytes := b.Get(vin.Txid)
+					outs := DeserializeOutputs(outsBytes)
+
+					for outIdx, out := range outs.Outputs {
+						if outIdx != vin.Vout {
+							updatedOuts.Outputs = append(updatedOuts.Outputs, out)
+						}
+					}
+
+					if len(updatedOuts.Outputs) == 0 {
+						err := b.Delete(vin.Txid)
+						if err != nil {
+							log.Panic(err)
+						}
+					} else {
+						err := b.Put(vin.Txid, updatedOuts.Serialize())
+						if err != nil {
+							log.Panic(err)
+						}
+					}
+
+				}
+			}
+
+			newOutputs := TxOutputs{}
+			newOutputs.Outputs = append(newOutputs.Outputs, tx.Vout...)
+
+			err := b.Put(tx.ID, newOutputs.Serialize())
+			if err != nil {
+				log.Panic(err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Panic(err)
+	}
 }
 
 // TxOutputs serves as a container for serializing an array of TxOutput

@@ -10,26 +10,28 @@ import (
 	"time"
 )
 
-// Block 定义了区块的数据结构
+// Block represents a block in the blockchain
 type Block struct {
 	Timestamp     int64
-	Transactions  []*Transaction // 区块包含的交易列表
+	Transactions  []*Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
-// HashTransactions 计算并返回交易列表的哈希值（简化的默克尔树根）
+// HashTransactions returns a hash of the transactions in the block
 func (b *Block) HashTransactions() []byte {
-	var txHashes [][]byte
+	var transactions [][]byte
+
 	for _, tx := range b.Transactions {
-		txHashes = append(txHashes, tx.ID)
+		transactions = append(transactions, tx.ID)
 	}
-	txHash := sha256.Sum256(bytes.Join(txHashes, []byte{}))
-	return txHash[:]
+	mTree := sha256.Sum256(bytes.Join(transactions, []byte{}))
+
+	return mTree[:]
 }
 
-// NewBlock 创建一个新的区块
+// NewBlock creates and returns Block
 func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
@@ -38,13 +40,13 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 		Hash:          []byte{},
 		Nonce:         0,
 	}
-	// 注意：哈希现在由挖矿过程决定，创建时不再计算
+	
+	// Note: Hash and Nonce are set by the proof-of-work algorithm
 	return block
 }
 
-// NewGenesisBlock 创建创世区块
+// NewGenesisBlock creates and returns genesis Block
 func NewGenesisBlock(coinbase *Transaction) *Block {
-	// 创世区块也需要通过挖矿来获得有效的哈希
 	block := NewBlock([]*Transaction{coinbase}, []byte{})
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
@@ -55,7 +57,7 @@ func NewGenesisBlock(coinbase *Transaction) *Block {
 	return block
 }
 
-// Serialize 使用 gob 编码将区块序列化为字节切片
+// Serialize serializes the block
 func (b *Block) Serialize() []byte {
 	var result bytes.Buffer
 	encoder := gob.NewEncoder(&result)
@@ -68,7 +70,7 @@ func (b *Block) Serialize() []byte {
 	return result.Bytes()
 }
 
-// DeserializeBlock 使用 gob 解码将字节切片反序列化为一个区块指针
+// DeserializeBlock deserializes a block
 func DeserializeBlock(d []byte) *Block {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))
