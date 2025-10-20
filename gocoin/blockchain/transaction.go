@@ -111,12 +111,12 @@ func (tx Transaction) String() string {
 
 // IsLockedWithKey checks if the output can be used by the owner of the pubkey
 func (out *TxOutput) IsLockedWithKey(pubKeyHash []byte) bool {
-	return bytes.Compare(out.PubKeyHash, pubKeyHash) == 0
+	return bytes.Equal(out.PubKeyHash, pubKeyHash)
 }
 
 // UsesKey checks if the input uses a specific key
 // For now, this is a simplified check.
 func (in *TxInput) UsesKey(pubKeyHash []byte) bool {
 	lockingHash := wallet.HashPubKey(in.PubKey)
-	return bytes.Compare(lockingHash, pubKeyHash) == 0
+	return bytes.Equal(lockingHash, pubKeyHash)
 }
