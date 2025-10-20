@@ -12,7 +12,7 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-const dbFile = "db"
+const dbFile = "blockchain.db" // ← 改回原来的名字
 const blocksBucket = "blocks"
 const genesisCoinbaseData = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
 
