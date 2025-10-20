@@ -160,13 +160,31 @@ func runMinerCmd(args []string) {
 	bc := NewBlockchain(coinbaseAddr)
 	defer bc.DB().Close()
 
+	// 计算当前区块链高度
+	currentHeight := 0
+	bci := bc.Iterator()
+	for {
+		block := bci.Next()
+		if block == nil {
+			break
+		}
+		currentHeight++
+		if len(block.PrevBlockHash) == 0 {
+			break
+		}
+	}
+
 	fmt.Println("矿工启动，按 Ctrl-C 停止")
-	height := 1
 	for {
 		// 仅打包 coinbase 交易
 		bc.MineBlock([]*Transaction{})
-		fmt.Printf("已挖出区块 #%d  %x\n", height, bc.Iterator().Next().Hash)
-		height++
+		currentHeight++
+		// 获取最新挖出的区块哈希
+		bci := bc.Iterator()
+		latestBlock := bci.Next()
+		if latestBlock != nil {
+			fmt.Printf("已挖出区块 #%d  %x\n", currentHeight, latestBlock.Hash)
+		}
 		time.Sleep(2 * time.Second) // 避免占满 CPU
 	}
 }
