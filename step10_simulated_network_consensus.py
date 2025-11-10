@@ -184,7 +184,7 @@ class Node:
             # 从scriptSig中获取公钥和签名
             signature = bytes.fromhex(script_sig['signature'])
             pubkey_bytes = bytes.fromhex(script_sig['publicKey'])
-            vk = ecdsa.VerifyingKey.from_string(pubkey_bytes, curve=CURVE, hashfunc=hashlib.sha256)
+            vk = ecdsa.VerifyingKey.from_string(pubkey_bytes, curve=CURVE)
             
             # 验证公钥是否能生成UTXO的地址
             if generate_address(pubkey_bytes) != utxo_spent['to_address']:
