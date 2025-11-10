@@ -21,7 +21,7 @@
 
 1.  **克隆或下载项目**
 
-        git clone [https://github.com/picasso250/my-bitcoin/](https://github.com/picasso250/my-bitcoin/)
+        git clone https://github.com/picasso250/my-bitcoin.git
         cd my-bitcoin
 
 2.  **安装依赖**
