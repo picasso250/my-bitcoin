@@ -1,6 +1,4 @@
-
 # Python 比特币从零实现：教学版
-<!-- Simplified Chinese -->
 
 这是一个通过纯 Python 代码、分步从零开始构建一个简化版比特币的项目。旨在帮助开发者通过亲手实践，深入理解比特币背后的核心密码学、数据结构和共识机制。
 
@@ -22,23 +20,20 @@
 本项目需要 **Python 3.7+**。
 
 1.  **克隆或下载项目**
-    ```bash
-    git clone <your-repo-url>
-    cd <repo-folder>
-    ```
+
+        git clone [https://github.com/picasso250/my-bitcoin/](https://github.com/picasso250/my-bitcoin/)
+        cd my-bitcoin
 
 2.  **安装依赖**
     项目依赖 `ecdsa` 库来处理椭圆曲线数字签名。我们推荐使用虚拟环境。
 
-    ```bash
-    # (可选) 创建并激活虚拟环境
-    python3 -m venv venv
-    source venv/bin/activate  # macOS/Linux
-    # venv\Scripts\activate   # Windows
+        # (可选) 创建并激活虚拟环境
+        python3 -m venv venv
+        source venv/bin/activate  # macOS/Linux
+        # venv\Scripts\activate   # Windows
 
-    # 安装所有依赖
-    pip install -r requirements.txt
-    ```
+        # 安装所有依赖
+        pip install -r requirements.txt
 
 ---
 
@@ -60,11 +55,10 @@
 #### 如何运行
 
 打开您的终端，并按顺序执行：
-```bash
-python step1_generate_keys.py
-python step2_sign_and_verify.py
-# ...以此类推
-```
+
+    python step1_generate_keys.py
+    python step2_sign_and_verify.py
+    # ...以此类推
 
 ---
 
