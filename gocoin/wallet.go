@@ -118,13 +118,11 @@ func (w Wallet) GetAddress() string {
 	return hex.EncodeToString(full)
 }
 
-/* ---------- 以下逻辑不变 ---------- */
-
+// HashPubKey now uses a single, full SHA256 hash, which is the modern approach.
+// The previous RIPEMD160 step has been removed.
 func HashPubKey(pubKey []byte) []byte {
 	h1 := sha256.Sum256(pubKey)
-	h2 := ripemd160.New()
-	h2.Write(h1[:])
-	return h2.Sum(nil)
+	return h1[:]
 }
 
 func checksum(payload []byte) []byte {
